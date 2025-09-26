@@ -102,7 +102,7 @@ def get_students_info(extracted_path):
                 if i =="Marks":
                     row_idx = find_average_row(wb_obj[i])
                     sheet_obj=wb_obj[i]
-                    avg = sheet_obj.cell(row=row_idx[0], column=88).value
+                    avg = sheet_obj.cell(row=row_idx[0]+1, column=88).value
                     data.update({"Average": avg})
                     print("data is",data)
                 
