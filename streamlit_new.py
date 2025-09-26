@@ -8,6 +8,7 @@ import openpyxl
 import os
 import re
 # Replace this with your actual backend function
+
 def run_backend_on_files(extracted_path):
     print("Extracted path is",extracted_path)
     #For now hardcoded:
@@ -78,10 +79,81 @@ def calculate_average_pilos(df):
     return df
 
 
-def get_students_info(tmpdir):
-    st.title("Student Information")
-    return {"Name": "John Doe", "Age": 25, "Major": "Computer Science"}
+def get_students_info(extracted_path):
+    st.text("Student Information")
+    student_info=[]
+    for root, dirs, files in os.walk(extracted_path):
+        for f in files:
+            p = os.path.join(root, f)
+            # To open the workbook
+            # workbook object is created
+            wb_obj = openpyxl.load_workbook(p, data_only=True)
+            data ={}
+            for i in wb_obj.sheetnames:
+                # print(i)
+                
+                if i =="Grades":
+                    sheet_obj=wb_obj[i]
+                    num_students = sheet_obj.cell(row=31, column=2).value
+                    section = sheet_obj.cell(row=5, column=8).value
+                    subject=sheet_obj.cell(row=2, column=8).value
+                    data.update({ "Subject": subject,"Number of Students": num_students, "Section": section})
+                    print("subject",subject)
+                if i =="Marks":
+                    row_idx = find_average_row(wb_obj[i])
+                    sheet_obj=wb_obj[i]
+                    avg = sheet_obj.cell(row=row_idx[0], column=88).value
+                    data.update({"Average": avg})
+                    print("data is",data)
+                
+            student_info.append(data)
+    print("student info is",student_info)     
+    student_df=pd.DataFrame(student_info)   
+    return student_df
 
+
+
+def find_average_row(sheet_obj):
+    data = sheet_obj.values
+    df = pd.DataFrame(data)
+    row_idx = df[df.apply(lambda row: row.astype(str).str.contains("Average", case=False).any(), axis=1)].index
+    return row_idx.tolist()  # list of row numbers where 'Average' appears
+
+
+
+def student_tool(tmpdir):
+    st.text("Loading each Subject's average grade, number of students, and section")
+    df = get_students_info(tmpdir)
+    # File uploader
+
+    st.success("Processing complete ✅")
+
+    # Display the dataframe
+    st.dataframe(df)
+
+    # Download option
+    csv = df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "Download as CSV",
+        csv,
+        "results.csv",
+        "text/csv",
+        key="download-csv"
+    )
+
+    # Copy to clipboard option (browser limitation workaround)
+    # Streamlit doesn’t allow direct clipboard copy on server,
+    # so we use JS trick:
+    st.text_area("Copy results:", df.to_csv(index=False), height=200)
+    st.caption("Select all (Ctrl+A) and copy (Ctrl+C)")
+
+    # Optional: If running locally and want automatic copy:
+    if st.button("Copy to Clipboard (local only)"):
+        try:
+            pyperclip.copy(df.to_csv(index=False))
+            st.success("Copied to clipboard!")
+        except Exception as e:
+            st.error(f"Clipboard copy failed: {e}")
 
 def pilos(tmpdir):
     
@@ -118,25 +190,22 @@ def pilos(tmpdir):
         except Exception as e:
             st.error(f"Clipboard copy failed: {e}")
 
+
+
+# ----------------- Streamlit App -----------------
 st.title("QAC ToolBox")
 
 uploaded_file = st.file_uploader("Upload a ZIP file", type=["zip"])
 
 if uploaded_file is not None:
-    # Create a temporary directory to extract zip
     with tempfile.TemporaryDirectory() as tmpdir:
         with zipfile.ZipFile(uploaded_file, "r") as z:
             z.extractall(tmpdir)
-        print(tmpdir)
-        # Run your backend code
-        
 
+        page_names_to_funcs = {
+            "PiLOs": pilos,
+            "Students": student_tool,
+        }
 
-page_names_to_funcs = {
-    "PiLOs": pilos(tmpdir),
-    "Students": get_students_info(tmpdir),
-    # "DataFrame Demo": data_frame_demo
-}
-
-demo_name = st.sidebar.selectbox("Choose a demo", page_names_to_funcs.keys())
-page_names_to_funcs[demo_name]()
+        demo_name = st.sidebar.selectbox("Choose a tool", page_names_to_funcs.keys())
+        page_names_to_funcs[demo_name](tmpdir)
