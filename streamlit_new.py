@@ -29,6 +29,10 @@ def run_backend_on_files(extracted_path):
             # from the active attribute
             for i in wb_obj.sheetnames:
                 # print(i)
+                if i =="Grades":
+                    sheet_obj=wb_obj[i]
+                    subject=sheet_obj.cell(row=2, column=8).value
+                
                 if i =="PILOsReport":
                     sheet_obj=wb_obj[i]
                     data =[]
@@ -48,7 +52,7 @@ def run_backend_on_files(extracted_path):
                         # for i in pilos_list:
                         # print("I is at",i)
                         if j =="Subject":
-                            subject = [splits.replace(".xlsx", "") for splits in p.split('\\') if "EENG" in splits][0]
+                            # subject = [splits.replace(".xlsx", "") for splits in p.split('\\') if "EENG" in splits][0]
                             d.update({j:subject})
                             print(j,p)
                         else:
@@ -59,25 +63,79 @@ def run_backend_on_files(extracted_path):
                 # print(d)
 
     pilos_df= pd.DataFrame(pilos_dict)
+    
 
-    final_pilos_df=calculate_average_pilos(pilos_df)
-    return final_pilos_df
+    pilos_processingdf,averages =calculate_average_pilos(pilos_df)
+    pilos_df=pilos_table(averages)
+    return pilos_processingdf,pilos_df 
 
 def calculate_average_pilos(df):
     so_columns = [col for col in df.columns if re.match(r'SO\d+', col)]
     averages=[]
+    dict_averages={}
 
     for col in df.columns:
         if col not in so_columns:
             averages.append("")
         else:
             list_of_percentages=df[col].dropna()
-            averages.append(list_of_percentages.mean())
-            # print("col",col, "list:",list_of_percentages)
+            pilos_mean=list_of_percentages.mean()
+            if pilos_mean is '':
+                pilos_mean= None
+            averages.append(pilos_mean)
+            dict_averages[col]= pilos_mean  # Dictionary
+            
     df.loc[len(df)] = averages
+    print("Averages are",dict_averages)
+    return df,dict_averages
+
+def pilos_table(averages):
+    import pandas as pd
+    mapping = {
+        1: "SO1", 2: "SO2", 3: "SO3", 4: "SO4", 5: "SO5", 6: "SO6", 7: "SO7"}
+    data = [
+        {
+            "PILO": 1,
+            "Performance Target": "An ability to identify, formulate, and solve complex engineering problems by applying principles of engineering, science, and mathematics."
+        
+        },
+        {
+            "PILO": 2,
+            "Performance Target": "An ability to apply engineering design to produce solutions that meet specified needs with consideration of public health, safety, and welfare, as well as global, cultural, social, environmental, and economic factors." 
+        },
+        {
+            "PILO": 3,
+            "Performance Target": "An ability to communicate effectively with a range of audiences."
+            
+        },
+        {
+            "PILO": 4,
+            "Performance Target": "An ability to recognize ethical and professional responsibilities in engineering situations and make informed judgments, which must consider the impact of engineering solutions in global, economic, environmental, and societal contexts."
+        },
+        {
+            "PILO": 5,
+            "Performance Target": "An ability to function effectively on a team whose members together provide leadership, create a collaborative and inclusive environment, establish goals, plan tasks, and meet objectives."
+        },
+        {
+            "PILO": 6,
+            "Performance Target": "An ability to develop and conduct appropriate experimentation, analyze and interpret data, and use engineering judgment to draw conclusions."
+        },
+        {
+            "PILO": 7,
+            "Performance Target": "An ability to acquire and apply new knowledge as needed, using appropriate learning strategies."        }
+    ]
+
+    for idx, d in enumerate(data):
+
+        d.update({"Results": averages[mapping[d["PILO"]]]*100})
+
+     # Add results from averages
+
+    df = pd.DataFrame(data)
+    df["Target"] = "70%"  # Add the common target column
+    df = df[["PILO", "Performance Target", "Target", "Results"]]  # Reorder columns
 
     return df
-
 
 def get_students_info(extracted_path):
     st.text("Student Information")
@@ -97,14 +155,13 @@ def get_students_info(extracted_path):
                     num_students = sheet_obj.cell(row=31, column=2).value
                     section = sheet_obj.cell(row=5, column=8).value
                     subject=sheet_obj.cell(row=2, column=8).value
-                    data.update({ "Subject": subject,"Number of Students": num_students, "Section": section})
+                    data.update({ "Course Code": subject, "Section": section,"Number of Students": num_students})
                     print("subject",subject)
                 if i =="Marks":
                     row_idx = find_average_row(wb_obj[i])
                     sheet_obj=wb_obj[i]
                     avg = sheet_obj.cell(row=row_idx[0]+1, column=88).value
                     data.update({"Average": avg})
-                    print("data is",data)
                 
             student_info.append(data)
     print("student info is",student_info)     
@@ -158,7 +215,7 @@ def student_tool(tmpdir):
 def pilos(tmpdir):
     
     st.text("Loading the PILOs' Average Calculator")
-    df = run_backend_on_files(tmpdir)
+    df,pilos_df = run_backend_on_files(tmpdir)
     # File uploader
 
     st.success("Processing complete ✅")
@@ -166,8 +223,10 @@ def pilos(tmpdir):
     # Display the dataframe
     st.dataframe(df)
 
+    st.dataframe(pilos_df)
+
     # Download option
-    csv = df.to_csv(index=False).encode("utf-8")
+    csv = pilos_df.to_csv(index=False).encode("utf-8")
     st.download_button(
         "Download as CSV",
         csv,
@@ -179,13 +238,13 @@ def pilos(tmpdir):
     # Copy to clipboard option (browser limitation workaround)
     # Streamlit doesn’t allow direct clipboard copy on server,
     # so we use JS trick:
-    st.text_area("Copy results:", df.to_csv(index=False), height=200)
+    st.text_area("Copy results:", pilos_df.to_csv(index=False), height=200)
     st.caption("Select all (Ctrl+A) and copy (Ctrl+C)")
 
     # Optional: If running locally and want automatic copy:
     if st.button("Copy to Clipboard (local only)"):
         try:
-            pyperclip.copy(df.to_csv(index=False))
+            pyperclip.copy(pilos_df.to_csv(index=False))
             st.success("Copied to clipboard!")
         except Exception as e:
             st.error(f"Clipboard copy failed: {e}")
