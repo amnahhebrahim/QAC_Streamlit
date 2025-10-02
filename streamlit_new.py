@@ -27,40 +27,37 @@ def run_backend_on_files(extracted_path):
 
             # Get workbook active sheet object
             # from the active attribute
-            for i in wb_obj.sheetnames:
-                # print(i)
-                if i =="Grades":
-                    sheet_obj=wb_obj[i]
-                    subject=sheet_obj.cell(row=2, column=8).value
+            grades_obj=wb_obj["Grades"]
+            pilos_obj=wb_obj["PILOsReport"]
+        
+            subject=grades_obj.cell(row=2, column=8).value
                 
-                if i =="PILOsReport":
-                    sheet_obj=wb_obj[i]
-                    data =[]
-                    for row in sheet_obj.iter_rows(min_row=start_row, max_row=end_row, min_col=start_column, max_col=end_column):
-                        row_data = []
-                        for cell in row:
-                            row_data.append(cell.value)
-                        data.append(row_data)
+            data =[]
+            for row in pilos_obj.iter_rows(min_row=start_row, max_row=end_row, min_col=start_column, max_col=end_column):
+                row_data = []
+                for cell in row:
+                    row_data.append(cell.value)
+                data.append(row_data)
 
-                    df_temp=pd.DataFrame(data)
-                    instructor=df_temp.iloc[0]
-                    pilos_asses=df_temp.iloc[17]
-                    pilos_list=pilos_asses.values.tolist()
-                    d={}
-                    columns_list=["Subject", "PILOS","SO1","SO2","SO3","SO4","SO5","SO6","SO7"]
-                    for j in columns_list:
-                        # for i in pilos_list:
-                        # print("I is at",i)
-                        if j =="Subject":
-                            # subject = [splits.replace(".xlsx", "") for splits in p.split('\\') if "EENG" in splits][0]
-                            d.update({j:subject})
-                            print(j,p)
-                        else:
-                            d.update({j:pilos_list[columns_list.index(j)]})
-                            print(j,pilos_list[columns_list.index(j)])
-                    # df_master=df_master.append(pilos_dict,ignore_index=True)
-                    pilos_dict.append(d)
-                # print(d)
+            df_temp=pd.DataFrame(data)
+            instructor=df_temp.iloc[0]
+            pilos_asses=df_temp.iloc[17]
+            pilos_list=pilos_asses.values.tolist()
+            d={}
+            columns_list=["Subject", "PILOS","SO1","SO2","SO3","SO4","SO5","SO6","SO7"]
+            for j in columns_list:
+                # for i in pilos_list:
+                # print("I is at",i)
+                if j =="Subject":
+                    # subject = [splits.replace(".xlsx", "") for splits in p.split('\\') if "EENG" in splits][0]
+                    d.update({j:subject})
+                    print(j,p)
+                else:
+                    d.update({j:pilos_list[columns_list.index(j)]})
+                    print(j,pilos_list[columns_list.index(j)])
+            # df_master=df_master.append(pilos_dict,ignore_index=True)
+            pilos_dict.append(d)
+            # print(d)
 
     pilos_df= pd.DataFrame(pilos_dict)
     
@@ -80,7 +77,7 @@ def calculate_average_pilos(df):
         else:
             list_of_percentages=df[col].dropna()
             pilos_mean=list_of_percentages.mean()
-            if pilos_mean is '':
+            if pilos_mean == '':
                 pilos_mean= None
             averages.append(pilos_mean)
             dict_averages[col]= pilos_mean  # Dictionary
@@ -147,22 +144,22 @@ def get_students_info(extracted_path):
             # workbook object is created
             wb_obj = openpyxl.load_workbook(p, data_only=True)
             data ={}
-            for i in wb_obj.sheetnames:
-                # print(i)
-                
-                if i =="Grades":
-                    sheet_obj=wb_obj[i]
-                    num_students = sheet_obj.cell(row=31, column=2).value
-                    section = sheet_obj.cell(row=5, column=8).value
-                    subject=sheet_obj.cell(row=2, column=8).value
-                    data.update({ "Course Code": subject, "Section": section,"Number of Students": num_students})
-                    print("subject",subject)
-                if i =="Marks":
-                    row_idx = find_average_row(wb_obj[i])
-                    sheet_obj=wb_obj[i]
-                    avg = sheet_obj.cell(row=row_idx[0]+1, column=88).value
-                    data.update({"Average": avg})
-                
+            # for i in wb_obj.sheetnames:
+            # print(i)
+            
+            # if i =="Grades":
+            grades_obj=wb_obj["Grades"]
+            num_students = grades_obj.cell(row=31, column=2).value
+            section = grades_obj.cell(row=5, column=8).value
+            subject=grades_obj.cell(row=2, column=8).value
+            data.update({ "Course Code": subject, "Section": section,"Number of Students": num_students})
+            print("subject",subject)
+            # if i =="Marks":
+            mark_obj=wb_obj["Marks"]
+            row_idx = find_average_row(mark_obj)
+            avg = mark_obj.cell(row=row_idx[0]+1, column=88).value
+            data.update({"Average": avg})
+        
             student_info.append(data)
     print("student info is",student_info)     
     student_df=pd.DataFrame(student_info)   
